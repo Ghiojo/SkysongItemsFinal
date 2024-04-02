@@ -6,8 +6,7 @@ import org.bukkit.NamespacedKey;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+
 
 import static net.md_5.bungee.api.ChatColor.COLOR_CHAR;
 
@@ -133,13 +132,22 @@ public class TextParser {
     public static List<String> manipulateSection(List<String> startingList, String[] inputLore, int blockIndex, boolean amIReplacing){
         String buffer = "";
         int wordCount = 0;
+        String colorBuffer = null;
 
         for(String word : inputLore){
+            if(CheckForColor(word) != null){
+                colorBuffer = CheckForColor(word);
+                colorBuffer = translateHexColorCodes("&#", "", colorBuffer);
+                colorBuffer = ChatColor.translateAlternateColorCodes('&', colorBuffer);
+            }
             String hexedWord = TextParser.translateHexColorCodes("&#", "", word);
             String wordcopy = hexedWord;
             //TODO: Make a method to check word length without counting HEX and color codes.
             if((wordCount + ChatColor.stripColor(wordcopy).length() + 1) > 45 || buffer.isEmpty()){
                 buffer = buffer.concat("\n" + COLOR_MAP.get(blockIndex));
+                if(colorBuffer != null){
+                    buffer = buffer.concat(colorBuffer);
+                }
                 wordCount = 0;
             }
             else{
@@ -162,9 +170,14 @@ public class TextParser {
         List<String> test = Arrays.asList(startingList.get(blockIndex).split("\n"));
 
         String buffer = test.get(test.size()-1);
+        String colorBuffer = null;
 
         List<String> newInput = new ArrayList<String>();
         for(String word : inputLore){
+            if(CheckForColor(word) != null){
+                colorBuffer = CheckForColor(word);
+
+            }
             word = TextParser.translateHexColorCodes("&#", "", word);
             word = ChatColor.translateAlternateColorCodes('&', word);
             String strippedBuffer = ChatColor.stripColor(buffer);
@@ -179,6 +192,10 @@ public class TextParser {
         }
         test.set(test.size()-1, buffer);
         startingList.set(blockIndex, String.join("\n", test));
+
+        if(colorBuffer != null){
+            newInput.set(0, colorBuffer + newInput.get(0));
+        }
 
         String[] arrayToSend = new String[newInput.size()];
         arrayToSend = newInput.toArray(arrayToSend);
@@ -232,5 +249,30 @@ public class TextParser {
         int count = input.length();
 
         return count;
+    }
+
+    public static String CheckForColor(String word){
+        final Pattern hexPattern = Pattern.compile( ".*&#" + "([A-Fa-f0-9]{6})");
+        final Pattern colPattern = Pattern.compile( ".*&" + "([A-Fa-fK-Rk-r0-9])");
+
+        if(hexPattern.matcher(word).find()){
+            Matcher matcher = hexPattern.matcher(word);
+            String group = null;
+            while (matcher.find())
+            {
+                group = "&#" + matcher.group(1);
+            }
+            return group;
+        }
+        if(colPattern.matcher(word).find()){
+            Matcher matcher = colPattern.matcher(word);
+            String group = null;
+            while (matcher.find())
+            {
+                group = "&" + matcher.group(1);
+            }
+            return group;
+        }
+        return null;
     }
 }
