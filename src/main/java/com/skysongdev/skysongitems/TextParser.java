@@ -17,6 +17,13 @@ public class TextParser {
 
     private static final Map<Integer, String> COLOR_MAP = Map.ofEntries(PHYSCOLOR, FUNCCOLOR, SKILLCOLOR);
 
+
+    private static final Map.Entry<Integer, String> PREPHYSCOLOR = new AbstractMap.SimpleEntry<>(0, "&7");
+    private static final Map.Entry<Integer, String> PREFUNCCOLOR = new AbstractMap.SimpleEntry<>(1, "&#424242");
+    private static final Map.Entry<Integer, String> PRESKILLCOLOR = new AbstractMap.SimpleEntry<>(2, "&#81A871");
+
+    private static final Map<Integer, String> PRE_COLOR_MAP = Map.ofEntries(PREPHYSCOLOR, PREFUNCCOLOR, PRESKILLCOLOR);
+
     public static NamespacedKey deletedKey = new NamespacedKey(Main.getPlugin(), "deleted_lines");
     public static List<String> parseText(List<String> inputlore, String deletedLines) {
         List<String> parsedList = new ArrayList<String>();
@@ -133,8 +140,12 @@ public class TextParser {
         String buffer = "";
         int wordCount = 0;
         String colorBuffer = null;
+        final Pattern clearPattern = Pattern.compile("&-");
 
         for(String word : inputLore){
+            if(clearPattern.matcher(word).find()){
+                word = word.replaceAll("&-", PRE_COLOR_MAP.get(blockIndex));
+            }
             if(CheckForColor(word) != null){
                 colorBuffer = CheckForColor(word);
                 colorBuffer = translateHexColorCodes("&#", "", colorBuffer);
@@ -142,7 +153,6 @@ public class TextParser {
             }
             String hexedWord = TextParser.translateHexColorCodes("&#", "", word);
             String wordcopy = hexedWord;
-            //TODO: Make a method to check word length without counting HEX and color codes.
             if((wordCount + ChatColor.stripColor(wordcopy).length() + 1) > 45 || buffer.isEmpty()){
                 buffer = buffer.concat("\n" + COLOR_MAP.get(blockIndex));
                 if(colorBuffer != null){
@@ -168,24 +178,31 @@ public class TextParser {
 
     public static List<String> manipulateSectionWithConcat(List<String> startingList, String[] inputLore, int blockIndex){
         List<String> test = Arrays.asList(startingList.get(blockIndex).split("\n"));
-
+        String tempword;
         String buffer = test.get(test.size()-1);
         String colorBuffer = null;
+        final Pattern clearPattern = Pattern.compile("&-");
 
         List<String> newInput = new ArrayList<String>();
+        boolean isBufferFull = false;
         for(String word : inputLore){
-            if(CheckForColor(word) != null){
-                colorBuffer = CheckForColor(word);
-
+            if(clearPattern.matcher(word).find()) {
+                word = word.replaceAll("&-", PRE_COLOR_MAP.get(blockIndex));
             }
-            word = TextParser.translateHexColorCodes("&#", "", word);
-            word = ChatColor.translateAlternateColorCodes('&', word);
+            tempword = TextParser.translateHexColorCodes("&#", "", word);
+            tempword = ChatColor.translateAlternateColorCodes('&', word);
             String strippedBuffer = ChatColor.stripColor(buffer);
-            String strippedWord = ChatColor.stripColor(word);
-            if(strippedBuffer.length() + strippedWord.length() + 1 <= 45) {
+            String strippedWord = ChatColor.stripColor(tempword);
+            if(strippedBuffer.length() + strippedWord.length() + 1 <= 45 && !isBufferFull) {
+                if(CheckForColor(word) != null){
+                    colorBuffer = CheckForColor(word);
+                }
+                word = TextParser.translateHexColorCodes("&#", "", word);
+                word = ChatColor.translateAlternateColorCodes('&', word);
                 buffer = buffer.concat(" " + word);
             }
             else{
+                isBufferFull = true;
                 newInput.add(word);
             }
                 
@@ -193,7 +210,7 @@ public class TextParser {
         test.set(test.size()-1, buffer);
         startingList.set(blockIndex, String.join("\n", test));
 
-        if(colorBuffer != null){
+        if(colorBuffer != null && !newInput.isEmpty()){
             newInput.set(0, colorBuffer + newInput.get(0));
         }
 
@@ -251,28 +268,18 @@ public class TextParser {
         return count;
     }
 
-    public static String CheckForColor(String word){
-        final Pattern hexPattern = Pattern.compile( ".*&#" + "([A-Fa-f0-9]{6})");
-        final Pattern colPattern = Pattern.compile( ".*&" + "([A-Fa-fK-Rk-r0-9])");
+    public static String CheckForColor(String word) {
+        final Pattern colorPattern = Pattern.compile("(&#([A-Fa-f0-9]{6})|&([A-Fa-fK-Rk-r0-9]))(&([K-Rk-r]))?");
 
-        if(hexPattern.matcher(word).find()){
-            Matcher matcher = hexPattern.matcher(word);
+        if (colorPattern.matcher(word).find()) {
+            Matcher matcher = colorPattern.matcher(word);
             String group = null;
-            while (matcher.find())
-            {
-                group = "&#" + matcher.group(1);
-            }
-            return group;
-        }
-        if(colPattern.matcher(word).find()){
-            Matcher matcher = colPattern.matcher(word);
-            String group = null;
-            while (matcher.find())
-            {
-                group = "&" + matcher.group(1);
+            while (matcher.find()) {
+                group = matcher.group();
             }
             return group;
         }
         return null;
     }
+
 }
